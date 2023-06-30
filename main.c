@@ -1,14 +1,19 @@
 #include "SDL_events.h"
+#include "SDL_keycode.h"
 #include "SDL_rect.h"
 #include "SDL_render.h"
+#include "SDL_stdinc.h"
 #include "SDL_surface.h"
+#include "SDL_timer.h"
 #include "SDL_video.h"
+#include <stdint.h>
 #include <stdio.h>
 #include <SDL.h>
 #include <SDL_image.h>
 
 const int WINDOW_HEIGHT = 720;
 const int WINDOW_WIDTH = 1280;
+const int ANIMATION_DELAY = 100;
 
 
 int main(int argc, char *argv[])
@@ -31,21 +36,38 @@ int main(int argc, char *argv[])
         SDL_Quit();
         return 1;
     }
+    
+    SDL_Surface* idleSurface = IMG_Load("assets\\dino.png");
+    SDL_Texture* idleTexture = SDL_CreateTextureFromSurface(renderer, idleSurface);
+    SDL_FreeSurface(idleSurface);
+    
+    SDL_Surface* runningSurface1 = IMG_Load("assets\\dino2.png");
+    SDL_Texture* runningTexture1 = SDL_CreateTextureFromSurface(renderer, runningSurface1);
+    SDL_FreeSurface(runningSurface1);
 
-    SDL_Surface* surface = IMG_Load("assets\\dino.png");
-    if (surface == NULL) {
-        printf("Failed to load image.");
+    SDL_Surface* runningSurface2 = IMG_Load("assets\\dino3.png");
+    SDL_Texture* runningTexture2 = SDL_CreateTextureFromSurface(renderer, runningSurface2);
+    SDL_FreeSurface(runningSurface2);
+    if (runningSurface2 == NULL) {
+        printf("image is null");
+        SDL_DestroyRenderer(renderer);
+        SDL_DestroyWindow(window);
+        SDL_Quit();
         return 1;
     }
 
-    SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer, surface);
-    SDL_FreeSurface(surface);
-
     int dinoWidth, dinoHeight;
-    SDL_QueryTexture(texture, NULL, NULL, &dinoWidth, &dinoHeight);
+    SDL_QueryTexture(idleTexture, NULL, NULL, &dinoWidth, &dinoHeight);
     int dinoX = 128;
     printf("%d", dinoX);
     int dinoY = (WINDOW_HEIGHT / 2 )- 20;
+
+    int isRunning = 0;
+    SDL_Texture* currentTexture = idleTexture;
+    SDL_Texture* runningTextures[] = {runningTexture1, runningTexture2};
+    int runningCount = 2;
+    int animFrame = 0;
+    Uint32 lastAnimationTime = 0;
 
     int quit = 0;
     while (!quit) {
@@ -54,18 +76,32 @@ int main(int argc, char *argv[])
             if (event.type == SDL_QUIT) {
                 quit = 1;
             }
+            else if (event.type == SDL_KEYDOWN) {
+                if (event.key.keysym.sym == SDLK_RETURN) {
+                    isRunning = 1;
+                }
+            }
+        }
+
+        Uint32 currentTicks = SDL_GetTicks();
+        if (isRunning && currentTicks - lastAnimationTime >= ANIMATION_DELAY) {
+            animFrame = (animFrame + 1) % runningCount;
+            currentTexture = runningTextures[animFrame];
+            lastAnimationTime = currentTicks;
         }
 
         SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
         SDL_RenderClear(renderer);
 
         SDL_Rect dinoRect = {dinoX, dinoY, dinoWidth, dinoHeight};
-        SDL_RenderCopy(renderer, texture, NULL, &dinoRect);
+        SDL_RenderCopy(renderer, currentTexture, NULL, &dinoRect);
 
         SDL_RenderPresent(renderer);
     }
 
-    SDL_DestroyTexture(texture);
+    SDL_DestroyTexture(idleTexture);
+    SDL_DestroyTexture(runningTexture1);
+    SDL_DestroyTexture(runningTexture2);
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
     SDL_Quit();
