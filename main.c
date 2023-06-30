@@ -1,11 +1,4 @@
-#include "SDL_events.h"
-#include "SDL_keycode.h"
-#include "SDL_rect.h"
-#include "SDL_render.h"
 #include "SDL_stdinc.h"
-#include "SDL_surface.h"
-#include "SDL_timer.h"
-#include "SDL_video.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <SDL.h>
@@ -14,6 +7,7 @@
 const int WINDOW_HEIGHT = 720;
 const int WINDOW_WIDTH = 1280;
 const int ANIMATION_DELAY = 100;
+const float GROUND_SCROLL_SPEED = 0.8f;
 
 
 int main(int argc, char *argv[])
@@ -48,13 +42,10 @@ int main(int argc, char *argv[])
     SDL_Surface* runningSurface2 = IMG_Load("assets\\dino3.png");
     SDL_Texture* runningTexture2 = SDL_CreateTextureFromSurface(renderer, runningSurface2);
     SDL_FreeSurface(runningSurface2);
-    if (runningSurface2 == NULL) {
-        printf("image is null");
-        SDL_DestroyRenderer(renderer);
-        SDL_DestroyWindow(window);
-        SDL_Quit();
-        return 1;
-    }
+
+    SDL_Surface* groundSurface = IMG_Load("assets\\ground.png");
+    SDL_Texture* groundTexture = SDL_CreateTextureFromSurface(renderer, groundSurface);
+    SDL_FreeSurface(groundSurface);
 
     int dinoWidth, dinoHeight;
     SDL_QueryTexture(idleTexture, NULL, NULL, &dinoWidth, &dinoHeight);
@@ -62,12 +53,20 @@ int main(int argc, char *argv[])
     printf("%d", dinoX);
     int dinoY = (WINDOW_HEIGHT / 2 )- 20;
 
+    int groundWidth = WINDOW_WIDTH;
+    int groundHeight;
+    SDL_QueryTexture(groundTexture, NULL, NULL, &groundWidth, &groundHeight);
+    int groundX = 0;
+    int groundY = dinoY + 80;
+    float groundOffset = 0.0f;
+
     int isRunning = 0;
     SDL_Texture* currentTexture = idleTexture;
     SDL_Texture* runningTextures[] = {runningTexture1, runningTexture2};
     int runningCount = 2;
     int animFrame = 0;
     Uint32 lastAnimationTime = 0;
+    Uint32 prevTicks = 0;
 
     int quit = 0;
     while (!quit) {
@@ -84,17 +83,32 @@ int main(int argc, char *argv[])
         }
 
         Uint32 currentTicks = SDL_GetTicks();
+        float deltaTime = (currentTicks - prevTicks) ;
+        prevTicks = currentTicks;
         if (isRunning && currentTicks - lastAnimationTime >= ANIMATION_DELAY) {
             animFrame = (animFrame + 1) % runningCount;
             currentTexture = runningTextures[animFrame];
             lastAnimationTime = currentTicks;
         }
 
+        if (isRunning) {
+            groundOffset += GROUND_SCROLL_SPEED * deltaTime;
+            if (groundOffset >= groundWidth) {
+                groundOffset = 0.0f;
+            }
+        }
+        
+
         SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
         SDL_RenderClear(renderer);
 
         SDL_Rect dinoRect = {dinoX, dinoY, dinoWidth, dinoHeight};
         SDL_RenderCopy(renderer, currentTexture, NULL, &dinoRect);
+
+        SDL_Rect groundSrcRect = {groundX - groundOffset, groundY, WINDOW_WIDTH, groundHeight};
+        SDL_Rect groundDestRect = {WINDOW_WIDTH - groundOffset, groundY, WINDOW_WIDTH, groundHeight};
+        SDL_RenderCopy(renderer, groundTexture, NULL, &groundSrcRect);
+        SDL_RenderCopy(renderer, groundTexture, NULL, &groundDestRect);
 
         SDL_RenderPresent(renderer);
     }
