@@ -1,17 +1,24 @@
-#include "SDL_stdinc.h"
+#include "SDL_keycode.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <SDL.h>
 #include <SDL_image.h>
+#include <stdlib.h>
+#include <time.h>
 
 const int WINDOW_HEIGHT = 720;
 const int WINDOW_WIDTH = 1280;
 const int ANIMATION_DELAY = 100;
-const float GROUND_SCROLL_SPEED = 0.8f;
+const float SCROLL_SPEED = 0.8f;
 
+int RandomNumber(int min, int max){
+    int random = (rand() % (max - min + 1) + min);
+    return random;
+}
 
 int main(int argc, char *argv[])
 {
+    srand(time(NULL));
     if (SDL_Init(SDL_INIT_VIDEO)) {
         printf("SDL initialization failed.");
         return 1;
@@ -47,10 +54,17 @@ int main(int argc, char *argv[])
     SDL_Texture* groundTexture = SDL_CreateTextureFromSurface(renderer, groundSurface);
     SDL_FreeSurface(groundSurface);
 
+    SDL_Surface* cactusSurface = IMG_Load("assets\\cactus.png");
+    SDL_Texture* cactusTexture = SDL_CreateTextureFromSurface(renderer, cactusSurface);
+    SDL_FreeSurface(cactusSurface);
+
+    SDL_Surface* cactusSurface2 = IMG_Load("assets\\cactus1.png");
+    SDL_Texture* cactusTexture2 = SDL_CreateTextureFromSurface(renderer, cactusSurface2);
+    SDL_FreeSurface(cactusSurface2);
+
     int dinoWidth, dinoHeight;
     SDL_QueryTexture(idleTexture, NULL, NULL, &dinoWidth, &dinoHeight);
     int dinoX = 128;
-    printf("%d", dinoX);
     int dinoY = (WINDOW_HEIGHT / 2 )- 20;
 
     int groundWidth = WINDOW_WIDTH;
@@ -60,6 +74,17 @@ int main(int argc, char *argv[])
     int groundY = dinoY + 80;
     float groundOffset = 0.0f;
 
+    int cactusWidth, cactusHeight;
+    SDL_QueryTexture(cactusTexture, NULL, NULL, &cactusWidth, &cactusHeight);
+    int cactusX = 1300;
+    int cactusY = groundY - (cactusHeight - 15);
+    float cactusOffset = 0.0f;
+
+    int cactusTwoWidth, cactusTwoHeight;
+    SDL_QueryTexture(cactusTexture2, NULL, NULL, &cactusTwoWidth, &cactusTwoHeight);
+    int cactusTwoY = cactusY;
+    float cactusTwoOffset = 0.0f;
+
     int isRunning = 0;
     SDL_Texture* currentTexture = idleTexture;
     SDL_Texture* runningTextures[] = {runningTexture1, runningTexture2};
@@ -67,6 +92,16 @@ int main(int argc, char *argv[])
     int animFrame = 0;
     Uint32 lastAnimationTime = 0;
     Uint32 prevTicks = 0;
+
+    float cactusInitRange = 0.0f;
+    int cactusInit = 0;
+    int cactusOneInit = RandomNumber(1280, 2560);
+    int cactusTwoInit = RandomNumber(1280, 2560);
+
+    int isJumping = 0;
+    float jumpHeight = 0.0f;
+    float jumpVelocity = 10.0f;
+    float gravity = 0.5f;
 
     int quit = 0;
     while (!quit) {
@@ -79,31 +114,73 @@ int main(int argc, char *argv[])
                 if (event.key.keysym.sym == SDLK_RETURN) {
                     isRunning = 1;
                 }
+                else if (event.key.keysym.sym == SDLK_SPACE) {
+                    if (!isJumping) {
+                        isJumping = 1;
+                        jumpHeight = jumpVelocity;
+                    }
+                }
             }
         }
 
         Uint32 currentTicks = SDL_GetTicks();
         float deltaTime = (currentTicks - prevTicks) ;
         prevTicks = currentTicks;
+
         if (isRunning && currentTicks - lastAnimationTime >= ANIMATION_DELAY) {
             animFrame = (animFrame + 1) % runningCount;
             currentTexture = runningTextures[animFrame];
             lastAnimationTime = currentTicks;
         }
 
-        if (isRunning) {
-            groundOffset += GROUND_SCROLL_SPEED * deltaTime;
+        if (isJumping) {
+            dinoY -= jumpHeight;
+            jumpHeight -= gravity;
+
+            if (jumpHeight <= 0.0f) {
+                isJumping = 0;
+                jumpHeight = 0.0f;
+            }
+        }
+
+        if (isRunning) { 
+            groundOffset += SCROLL_SPEED * deltaTime;
+            if (!cactusInit) {
+                cactusInitRange += SCROLL_SPEED * deltaTime;
+                if (cactusInitRange >= 2048) {
+                    cactusInit = 1;
+                }
+            }
+            if (cactusInit) {
+                cactusOffset += SCROLL_SPEED * deltaTime;
+                cactusTwoOffset += SCROLL_SPEED * deltaTime;
+                if (cactusOffset >= cactusOneInit) {
+                    cactusOffset = 0;
+                    cactusOneInit = RandomNumber(1280, 2560);
+                }
+                if (cactusTwoOffset >= cactusTwoInit) {
+                    cactusTwoOffset = 0;
+                    cactusTwoInit = RandomNumber(1280, 2560);
+                }
+            }
             if (groundOffset >= groundWidth) {
                 groundOffset = 0.0f;
             }
         }
-        
 
         SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
         SDL_RenderClear(renderer);
 
         SDL_Rect dinoRect = {dinoX, dinoY, dinoWidth, dinoHeight};
         SDL_RenderCopy(renderer, currentTexture, NULL, &dinoRect);
+
+        int cactusOnePosition = cactusOneInit - cactusOffset;
+        SDL_Rect cactusRect = {cactusOnePosition, cactusY, cactusWidth, cactusHeight};
+        SDL_RenderCopy(renderer, cactusTexture, NULL, &cactusRect);
+
+        int cactusTwoPosition = cactusTwoInit - cactusTwoOffset;
+        SDL_Rect cactusRect2 = {cactusTwoPosition, cactusTwoY, cactusTwoWidth, cactusTwoHeight};
+        SDL_RenderCopy(renderer, cactusTexture2, NULL, &cactusRect2);
 
         SDL_Rect groundSrcRect = {groundX - groundOffset, groundY, WINDOW_WIDTH, groundHeight};
         SDL_Rect groundDestRect = {WINDOW_WIDTH - groundOffset, groundY, WINDOW_WIDTH, groundHeight};
@@ -116,6 +193,9 @@ int main(int argc, char *argv[])
     SDL_DestroyTexture(idleTexture);
     SDL_DestroyTexture(runningTexture1);
     SDL_DestroyTexture(runningTexture2);
+    SDL_DestroyTexture(cactusTexture2);
+    SDL_DestroyTexture(groundTexture);
+    SDL_DestroyTexture(cactusTexture);
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
     SDL_Quit();
